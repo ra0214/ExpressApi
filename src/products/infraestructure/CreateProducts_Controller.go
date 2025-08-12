@@ -1,8 +1,11 @@
 package infraestructure
 
 import (
+	"encoding/json"
 	"expresApi/src/products/application"
+	wsocket "expresApi/src/websocket"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -34,6 +37,24 @@ func (ct_c *CreateProductController) Execute(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al guardar el producto", "detalles": err.Error()})
 		return
+	}
+
+	// Enviar notificación WebSocket
+	wsMessage := map[string]interface{}{
+		"type":      "product_created",
+		"timestamp": time.Now().Format(time.RFC3339),
+		"data": map[string]interface{}{
+			"name":        body.Name,
+			"description": body.Description,
+			"price":       body.Price,
+			"category":    body.Category,
+			"image_url":   body.ImageURL,
+			"action":      "creado",
+		},
+	}
+
+	if messageBytes, err := json.Marshal(wsMessage); err == nil {
+		wsocket.BroadcastMessage(messageBytes)
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"message": "Producto agregado correctamente"})

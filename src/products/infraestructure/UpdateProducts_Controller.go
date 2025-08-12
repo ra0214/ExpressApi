@@ -1,8 +1,11 @@
 package infraestructure
 
 import (
+	"encoding/json"
 	"expresApi/src/products/application"
+	wsocket "expresApi/src/websocket"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -40,6 +43,25 @@ func (u *UpdateProductController) Execute(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al actualizar el producto", "detalles": err.Error()})
 		return
+	}
+
+	// Enviar notificación WebSocket
+	wsMessage := map[string]interface{}{
+		"type":      "product_update",
+		"timestamp": time.Now().Format(time.RFC3339),
+		"data": map[string]interface{}{
+			"id":          id,
+			"name":        body.Name,
+			"description": body.Description,
+			"price":       body.Price,
+			"category":    body.Category,
+			"image_url":   body.ImageURL,
+			"action":      "actualizado",
+		},
+	}
+
+	if messageBytes, err := json.Marshal(wsMessage); err == nil {
+		wsocket.BroadcastMessage(messageBytes)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Producto actualizado correctamente"})

@@ -1,11 +1,14 @@
 package infrastructure
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
+	"time"
 
 	"expresApi/src/comments/application"
 	"expresApi/src/comments/domain"
+	wsocket "expresApi/src/websocket"
 
 	"github.com/gin-gonic/gin"
 )
@@ -41,6 +44,24 @@ func (c *CommentController) CreateComment(ctx *gin.Context) {
 			"details": err.Error(),
 		})
 		return
+	}
+
+	// Enviar notificación WebSocket
+	wsMessage := map[string]interface{}{
+		"type":      "comment_created",
+		"timestamp": time.Now().Format(time.RFC3339),
+		"data": map[string]interface{}{
+			"id":         comment.ID,
+			"comment":    comment.Comment,
+			"user_name":  comment.UserName,
+			"rating":     comment.Rating,
+			"product_id": comment.ProductID,
+			"action":     "creado",
+		},
+	}
+
+	if messageBytes, err := json.Marshal(wsMessage); err == nil {
+		wsocket.BroadcastMessage(messageBytes)
 	}
 
 	ctx.JSON(http.StatusCreated, gin.H{
@@ -136,6 +157,20 @@ func (c *CommentController) DeleteComment(ctx *gin.Context) {
 			"details": err.Error(),
 		})
 		return
+	}
+
+	// Enviar notificación WebSocket
+	wsMessage := map[string]interface{}{
+		"type":      "comment_deleted",
+		"timestamp": time.Now().Format(time.RFC3339),
+		"data": map[string]interface{}{
+			"id":     id,
+			"action": "eliminado",
+		},
+	}
+
+	if messageBytes, err := json.Marshal(wsMessage); err == nil {
+		wsocket.BroadcastMessage(messageBytes)
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{
