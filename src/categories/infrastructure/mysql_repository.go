@@ -6,6 +6,7 @@ import (
 	"expresApi/src/config"
 	"fmt"
 	"log"
+	"time"
 )
 
 // MySQLCategoryRepository implementa ICategoryRepository para MySQL
@@ -52,7 +53,9 @@ func (r *MySQLCategoryRepository) CreateCategory(request domain.CreateCategoryRe
 // GetAllCategories obtiene todas las categorías
 func (r *MySQLCategoryRepository) GetAllCategories() ([]domain.Category, error) {
 	query := `
-		SELECT id, name, description, image_url, is_active, created_at, updated_at 
+		SELECT id, name, description, image_url, is_active, 
+		       DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') as created_at_formatted,
+		       DATE_FORMAT(updated_at, '%Y-%m-%d %H:%i:%s') as updated_at_formatted
 		FROM categories 
 		ORDER BY name ASC
 	`
@@ -69,7 +72,9 @@ func (r *MySQLCategoryRepository) GetAllCategories() ([]domain.Category, error) 
 // GetActiveCategories obtiene solo las categorías activas
 func (r *MySQLCategoryRepository) GetActiveCategories() ([]domain.Category, error) {
 	query := `
-		SELECT id, name, description, image_url, is_active, created_at, updated_at 
+		SELECT id, name, description, image_url, is_active, 
+		       DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') as created_at_formatted,
+		       DATE_FORMAT(updated_at, '%Y-%m-%d %H:%i:%s') as updated_at_formatted
 		FROM categories 
 		WHERE is_active = true 
 		ORDER BY name ASC
@@ -87,7 +92,9 @@ func (r *MySQLCategoryRepository) GetActiveCategories() ([]domain.Category, erro
 // GetCategoryByID obtiene una categoría por su ID
 func (r *MySQLCategoryRepository) GetCategoryByID(id int) (*domain.Category, error) {
 	query := `
-		SELECT id, name, description, image_url, is_active, created_at, updated_at 
+		SELECT id, name, description, image_url, is_active, 
+		       DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') as created_at_formatted,
+		       DATE_FORMAT(updated_at, '%Y-%m-%d %H:%i:%s') as updated_at_formatted
 		FROM categories 
 		WHERE id = ?
 	`
@@ -113,7 +120,9 @@ func (r *MySQLCategoryRepository) GetCategoryByID(id int) (*domain.Category, err
 // GetCategoryByName obtiene una categoría por su nombre
 func (r *MySQLCategoryRepository) GetCategoryByName(name string) (*domain.Category, error) {
 	query := `
-		SELECT id, name, description, image_url, is_active, created_at, updated_at 
+		SELECT id, name, description, image_url, is_active, 
+		       DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') as created_at_formatted,
+		       DATE_FORMAT(updated_at, '%Y-%m-%d %H:%i:%s') as updated_at_formatted
 		FROM categories 
 		WHERE name = ?
 	`
@@ -237,18 +246,53 @@ func (r *MySQLCategoryRepository) scanCategories(rows *sql.Rows) ([]domain.Categ
 
 	for rows.Next() {
 		var category domain.Category
+		var createdAtStr, updatedAtStr sql.NullString
+		var description, imageURL sql.NullString
+
 		err := rows.Scan(
 			&category.ID,
 			&category.Name,
-			&category.Description,
-			&category.ImageURL,
+			&description,
+			&imageURL,
 			&category.IsActive,
-			&category.CreatedAt,
-			&category.UpdatedAt,
+			&createdAtStr,
+			&updatedAtStr,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("error al escanear la categoría: %v", err)
 		}
+
+		// Manejar valores NULL
+		if description.Valid {
+			category.Description = description.String
+		}
+		if imageURL.Valid {
+			category.ImageURL = imageURL.String
+		}
+
+		// Manejar fechas
+		if createdAtStr.Valid && createdAtStr.String != "" {
+			if parsedTime, err := time.Parse("2006-01-02 15:04:05", createdAtStr.String); err == nil {
+				category.CreatedAt = parsedTime
+			} else {
+				// Si falla el parsing, usar fecha actual
+				category.CreatedAt = time.Now()
+			}
+		} else {
+			category.CreatedAt = time.Now()
+		}
+
+		if updatedAtStr.Valid && updatedAtStr.String != "" {
+			if parsedTime, err := time.Parse("2006-01-02 15:04:05", updatedAtStr.String); err == nil {
+				category.UpdatedAt = parsedTime
+			} else {
+				// Si falla el parsing, usar fecha actual
+				category.UpdatedAt = time.Now()
+			}
+		} else {
+			category.UpdatedAt = time.Now()
+		}
+
 		categories = append(categories, category)
 	}
 
