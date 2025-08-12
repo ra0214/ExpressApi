@@ -1,6 +1,7 @@
 package main
 
 import (
+	categoryInfra "expresApi/src/categories/infrastructure"
 	commentInfra "expresApi/src/comments/infrastructure"
 	"expresApi/src/config"
 	"expresApi/src/config/middleware"
@@ -39,6 +40,10 @@ func main() {
 
 	// Configurar rutas de comentarios
 	commentInfra.InitComments(r, dbConfig.DB)
+
+	// Configurar rutas de categorías
+	categoryGroup := r.Group("/api/v1")
+	categoryInfra.RegisterCategoryRoutes(categoryGroup)
 
 	// Configurar WebSocket
 	go wsocket.WSHub.Run()
